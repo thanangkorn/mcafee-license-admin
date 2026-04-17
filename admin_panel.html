@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>License Key Manager</title>
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+
+  :root {
+    --bg-primary: #000000;
+    --bg-secondary: #1c1c1e;
+    --bg-tertiary: #2c2c2e;
+    --bg-card: #1c1c1e;
+    --bg-elevated: #2c2c2e;
+    --separator: rgba(84, 84, 88, 0.35);
+    --label-primary: #ffffff;
+    --label-secondary: rgba(235, 235, 245, 0.6);
+    --label-tertiary: rgba(235, 235, 245, 0.3);
+    --blue: #0A84FF;
+    --green: #30D158;
+    --orange: #FF9F0A;
+    --red: #FF453A;
+    --yellow: #FFD60A;
+    --purple: #BF5AF2;
+    --blue-dim: rgba(10, 132, 255, 0.15);
+    --green-dim: rgba(48, 209, 88, 0.15);
+    --orange-dim: rgba(255, 159, 10, 0.15);
+    --red-dim: rgba(255, 69, 58, 0.15);
+  }
+
+  html, body {
+    background: var(--bg-primary);
+    color: var(--label-primary);
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.47;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(10, 132, 255, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(191, 90, 242, 0.05), transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ════════════ Lock Screen ════════════ */
+  .lock {
+    position: fixed; inset: 0;
+    background: var(--bg-primary);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; padding: 20px;
+  }
+  .lock-box {
+    background: var(--bg-card);
+    border: 0.5px solid var(--separator);
+    border-radius: 20px; padding: 40px 32px;
+    width: 100%; max-width: 400px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .lock-icon {
+    width: 64px; height: 64px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--blue), #0066cc);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 28px;
+    box-shadow: 0 8px 24px rgba(10, 132, 255, 0.3);
+  }
+  .lock-box h2 {
+    font-size: 22px; font-weight: 700;
+    letter-spacing: -0.5px; margin-bottom: 8px;
+  }
+  .lock-box p {
+    color: var(--label-secondary);
+    font-size: 14px; margin-bottom: 24px;
+  }
+  .lock-box input[type=password] {
+    width: 100%; padding: 14px 16px;
+    background: var(--bg-primary);
+    border: 0.5px solid var(--separator);
+    color: var(--label-primary);
+    font: inherit; font-size: 16px;
+    border-radius: 12px; outline: none;
+    text-align: center; margin-bottom: 12px;
+  }
+  .lock-box input[type=password]:focus { border-color: var(--blue); }
+  .lock-box input.error { border-color: var(--red); animation: shake 0.4s; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
+  }
+  .lock-btn {
+    width: 100%; padding: 14px;
+    background: var(--blue); color: #fff;
+    border: none; border-radius: 12px;
+    font: inherit; font-weight: 600; font-size: 15px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .lock-btn:hover { background: #0077e5; }
+  .lock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .lock-msg {
+    margin-top: 12px; min-height: 18px;
+    font-size: 13px; color: var(--red);
+  }
+  .lock-msg.ok { color: var(--green); }
+  .lock-hint {
+    margin-top: 20px; padding-top: 20px;
+    border-top: 0.5px solid var(--separator);
+    font-size: 12px; color: var(--label-tertiary);
+  }
+
+  /* ════════════ Layout ════════════ */
+  .app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 0.5px solid var(--separator);
+    margin: 0 -24px 28px; padding: 0 24px;
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--blue), #0066cc);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; box-shadow: 0 4px 12px rgba(10,132,255,0.3);
+  }
+  .brand-title {
+    font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+  }
+  .brand-sub {
+    font-size: 11px; color: var(--label-tertiary); margin-top: 1px;
+  }
+  .nav-actions { display: flex; gap: 8px; align-items: center; }
+  .icon-btn {
+    background: var(--bg-elevated); border: 0.5px solid var(--separator);
+    color: var(--label-secondary);
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .icon-btn:hover { background: var(--bg-tertiary); color: var(--label-primary); }
+
+  /* ════════════ Stats ════════════ */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg-card); border: 0.5px solid var(--separator);
+    border-radius: 14px; padding: 18px 20px;
+    position: relative; transition: transform 0.2s, border-color 0.2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.12); }
+  .stat-label {
+    font-size: 12px; font-weight: 500; color: var(--label-tertiary);
+    text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;
+  }
+  .stat-value { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  .stat-card .dot {
+    position: absolute; top: 18px; right: 18px;
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .stat-card.total .stat-value { color: var(--label-primary); }
+  .stat-card.total .dot { background: var(--blue); box-shadow: 0 0 12px var(--blue); }
+  .stat-card.unused .stat-value { color: var(--green); }
+  .stat-card.unused .dot { background: var(--green); box-shadow: 0 0 12px var(--green); }
+  .stat-card.used .stat-value { color: var(--orange); }
+  .stat-card.used .dot { background: var(--orange); box-shadow: 0 0 12px var(--orange); }
+  .stat-card.revoked .stat-value { color: var(--red); }
+  .stat-card.revoked .dot { background: var(--red); }
+
+  /* ════════════ Tabs ════════════ */
+  .segmented {
+    display: inline-flex; background: var(--bg-elevated);
+    border-radius: 10px; padding: 3px; margin-bottom: 20px;
+  }
+  .segment {
+    padding: 7px 16px; font: inherit; font-size: 14px; font-weight: 500;
+    color: var(--label-secondary); background: transparent;
+    border: none; border-radius: 7px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .segment.active {
+    background: #48484a; color: var(--label-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* ════════════ Toolbar ════════════ */
+  .toolbar {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .search { flex: 1; min-width: 200px; position: relative; }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%); color: var(--label-tertiary);
+    font-size: 16px; pointer-events: none; display: flex;
+  }
+  .search input {
+    width: 100%; background: var(--bg-secondary);
+    border: 0.5px solid var(--separator); color: var(--label-primary);
+    padding: 11px 14px 11px 40px; border-radius: 10px;
+    font: inherit; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .search input:focus { border-color: var(--blue); }
+  .filter-pill {
+    background: var(--bg-elevated); border: 0.5px solid var(--separator);
+    color: var(--label-primary); padding: 10px 14px;
+    border-radius: 10px; font: inherit; font-size: 14px; outline: none; cursor: pointer;
+  }
+  .btn {
+    padding: 10px 16px; border-radius: 10px;
+    font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--blue); color: #fff;
+    box-shadow: 0 2px 8px rgba(10,132,255,0.25);
+  }
+  .btn-primary:hover {
+    background: #0077e5; transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(10,132,255,0.35);
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: var(--bg-elevated); border: 0.5px solid var(--separator);
+    color: var(--label-primary);
+  }
+  .btn-secondary:hover { background: var(--bg-tertiary); }
+  .btn-success { background: var(--green); color: #000; font-weight: 700; }
+  .btn-success:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #e53e34; }
+  .btn-icon-only { padding: 10px; width: 40px; justify-content: center; }
+
+  /* ════════════ Add Form ════════════ */
+  .add-form {
+    background: var(--bg-card); border: 0.5px solid var(--separator);
+    border-radius: 16px; padding: 24px; margin-bottom: 20px;
+  }
+  .add-form h3 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .add-form .sub { color: var(--label-tertiary); font-size: 13px; margin-bottom: 18px; }
+  .mode-segmented {
+    display: inline-flex; background: var(--bg-primary);
+    border: 0.5px solid var(--separator); border-radius: 10px; padding: 3px; margin-bottom: 18px;
+  }
+  .mode-btn {
+    padding: 7px 16px; font: inherit; font-size: 13px; font-weight: 500;
+    color: var(--label-secondary); background: transparent;
+    border: none; border-radius: 7px; cursor: pointer;
+  }
+  .mode-btn.active { background: var(--blue); color: #fff; }
+
+  .input-group { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .input-field { display: flex; flex-direction: column; gap: 6px; }
+  .input-field label { font-size: 12px; color: var(--label-secondary); font-weight: 500; }
+  .input-field input, .input-field textarea, .input-field select {
+    background: var(--bg-primary); border: 0.5px solid var(--separator);
+    color: var(--label-primary); padding: 12px 14px;
+    border-radius: 10px; font: inherit; font-size: 14px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-field input:focus, .input-field textarea:focus { border-color: var(--blue); }
+
+  .key-input {
+    font-family: 'SF Mono', Menlo, Consolas, monospace !important;
+    font-size: 24px !important; letter-spacing: 4px !important;
+    text-align: center; font-weight: 700;
+    padding: 18px 16px !important;
+  }
+  .key-input.valid { border-color: var(--green) !important; background: rgba(48,209,88,0.05) !important; }
+  .key-input.invalid { border-color: var(--red) !important; background: rgba(255,69,58,0.05) !important; }
+
+  .char-count {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--label-tertiary);
+    text-align: right; margin-top: 6px;
+  }
+  .char-count.valid { color: var(--green); }
+  .char-count.invalid { color: var(--red); }
+  .validation-msg { font-size: 13px; margin-top: 10px; min-height: 18px; color: var(--red); }
+  .validation-msg.ok { color: var(--green); }
+
+  .multi-textarea {
+    width: 100%; min-height: 200px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace !important;
+    font-size: 16px !important; line-height: 1.8;
+    background: var(--bg-primary) !important;
+    border: 0.5px solid var(--separator) !important;
+    color: var(--blue) !important;
+    padding: 14px !important; border-radius: 10px; outline: none; resize: vertical;
+  }
+  .multi-info {
+    display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; flex-wrap: wrap;
+  }
+  .multi-info .count { color: var(--green); font-weight: 600; }
+  .multi-info .errors { color: var(--red); }
+
+  /* Version checkbox */
+  .version-select {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;
+  }
+  .version-checkbox {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px;
+    background: var(--bg-primary); border: 0.5px solid var(--separator);
+    cursor: pointer; user-select: none; font-size: 13px; transition: all 0.15s;
+  }
+  .version-checkbox:hover { border-color: var(--blue); }
+  .version-checkbox.checked {
+    background: var(--blue-dim); border-color: var(--blue); color: var(--blue);
+  }
+  .version-checkbox input { display: none; }
+  .version-checkbox.none {
+    color: var(--label-tertiary); font-style: italic;
+  }
+  .version-checkbox.none.checked {
+    background: rgba(191,90,242,0.15); border-color: var(--purple); color: var(--purple);
+  }
+
+  /* ════════════ Table ════════════ */
+  .table-card {
+    background: var(--bg-card); border: 0.5px solid var(--separator);
+    border-radius: 16px; overflow: hidden;
+  }
+  .bulk-bar {
+    padding: 12px 20px; background: var(--blue-dim);
+    border-bottom: 0.5px solid var(--separator);
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .bulk-count { color: var(--blue); font-weight: 600; font-size: 14px; }
+  .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .table-header, .table-row {
+    display: grid;
+    grid-template-columns: 32px 1.5fr 90px 110px 1fr 1fr 110px;
+    align-items: center; padding: 12px 20px; gap: 12px;
+  }
+  .table-header {
+    background: rgba(255,255,255,0.02);
+    border-bottom: 0.5px solid var(--separator);
+    font-size: 11px; font-weight: 600; color: var(--label-tertiary);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .table-row {
+    border-bottom: 0.5px solid var(--separator);
+    transition: background 0.15s; font-size: 13px;
+  }
+  .table-row:last-child { border-bottom: none; }
+  .table-row:hover { background: rgba(255,255,255,0.03); }
+  .table-row.selected { background: var(--blue-dim); }
+
+  .row-check {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .check-box {
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 1.5px solid var(--label-tertiary);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .check-box.checked {
+    background: var(--blue); border-color: var(--blue);
+  }
+  .check-box.checked::after {
+    content: '✓'; color: #fff; font-size: 12px; font-weight: bold;
+  }
+
+  .key-code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 14px; font-weight: 600; letter-spacing: 1.5px;
+    cursor: pointer;
+  }
+  .key-unused { color: var(--blue); }
+  .key-used, .key-revoked { color: var(--label-tertiary); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge::before {
+    content: ''; width: 6px; height: 6px;
+    border-radius: 50%; background: currentColor;
+  }
+  .badge-unused { background: var(--green-dim); color: var(--green); }
+  .badge-used { background: var(--orange-dim); color: var(--orange); }
+  .badge-revoked { background: var(--red-dim); color: var(--red); }
+
+  .version-pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 6px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px; font-weight: 600;
+    background: var(--blue-dim); color: var(--blue);
+    margin-right: 3px; cursor: pointer;
+  }
+  .version-pill.all {
+    background: rgba(191,90,242,0.15); color: var(--purple);
+  }
+  .version-edit {
+    color: var(--label-tertiary); font-size: 11px;
+    cursor: pointer; transition: color 0.15s;
+  }
+  .version-edit:hover { color: var(--blue); }
+
+  .note-text {
+    font-size: 13px; color: var(--label-secondary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .used-info {
+    font-size: 12px; color: var(--label-secondary); line-height: 1.4;
+  }
+  .used-info .ip {
+    color: var(--label-tertiary);
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+  }
+
+  .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .action-btn {
+    padding: 5px 10px; border-radius: 6px;
+    font: inherit; font-size: 11px; font-weight: 500;
+    background: transparent; cursor: pointer;
+    border: 0.5px solid; transition: all 0.15s;
+  }
+  .action-revoke { color: var(--orange); border-color: rgba(255,159,10,0.4); }
+  .action-revoke:hover { background: var(--orange-dim); }
+  .action-delete { color: var(--red); border-color: rgba(255,69,58,0.4); }
+  .action-delete:hover { background: var(--red-dim); }
+
+  .empty {
+    padding: 60px 20px; text-align: center;
+    color: var(--label-tertiary); font-size: 14px;
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+
+  /* ════════════ Logs ════════════ */
+  .log-row {
+    display: grid;
+    grid-template-columns: 150px 1.3fr 110px 120px 80px 1fr;
+    align-items: center; padding: 12px 20px; gap: 12px;
+    border-bottom: 0.5px solid var(--separator);
+    font-size: 12px;
+  }
+  .log-header {
+    background: rgba(255,255,255,0.02);
+    font-weight: 600; color: var(--label-tertiary);
+    text-transform: uppercase; letter-spacing: 0.8px; font-size: 11px;
+  }
+  .log-time { color: var(--label-secondary); font-family: 'SF Mono', monospace; font-size: 11px; }
+  .log-key { color: var(--label-secondary); font-family: 'SF Mono', monospace; font-size: 12px; }
+  .log-status { font-weight: 600; font-size: 11px; }
+  .log-ip { color: var(--label-tertiary); font-family: 'SF Mono', monospace; font-size: 11px; }
+  .log-version { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--blue); }
+  .log-msg { font-size: 11px; color: var(--label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .status-success { color: var(--green); }
+  .status-invalid { color: var(--red); }
+  .status-already_used { color: var(--orange); }
+  .status-revoked { color: var(--label-tertiary); }
+  .status-wrong_version { color: var(--yellow); }
+
+  /* ════════════ Dashboard ════════════ */
+  .dashboard-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 20px;
+  }
+  .dashboard-card {
+    background: var(--bg-card); border: 0.5px solid var(--separator);
+    border-radius: 16px; padding: 20px;
+  }
+  .dashboard-card h3 {
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 16px; letter-spacing: -0.2px;
+  }
+  .top-ip-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .top-ip-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-radius: 8px;
+    background: var(--bg-primary); font-size: 13px;
+  }
+  .top-ip-addr {
+    font-family: 'SF Mono', monospace; color: var(--blue); font-weight: 600;
+  }
+  .top-ip-count {
+    color: var(--label-secondary); font-weight: 600;
+  }
+  .chart-container {
+    position: relative; height: 260px;
+  }
+
+  /* ════════════ Modal ════════════ */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal {
+    background: var(--bg-card); border: 0.5px solid var(--separator);
+    border-radius: 20px; padding: 28px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+  .modal-actions {
+    display: flex; gap: 10px; justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  /* ════════════ Footer ════════════ */
+  .footer {
+    text-align: center; font-size: 12px;
+    color: var(--label-tertiary); padding: 32px 0;
+    font-family: 'SF Mono', monospace;
+  }
+
+  /* ════════════ Success/Error toast ════════════ */
+  .toast {
+    position: fixed; top: 20px; right: 20px; z-index: 10000;
+    padding: 14px 20px; border-radius: 12px;
+    font-weight: 600; font-size: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    animation: slideIn 0.25s ease-out;
+  }
+  .toast.success { background: var(--green); color: #000; }
+  .toast.error { background: var(--red); color: #fff; }
+  @keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* ════════════ Config alert ════════════ */
+  .alert {
+    background: var(--red-dim); border: 0.5px solid var(--red);
+    border-radius: 12px; padding: 14px 18px;
+    margin-bottom: 16px; font-size: 13px; color: #fff;
+  }
+  .alert strong { color: var(--red); }
+  code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', monospace; font-size: 12px; }
+
+  /* ════════════ Mobile ════════════ */
+  @media (max-width: 900px) {
+    .table-header, .table-row {
+      grid-template-columns: 32px 1fr auto;
+      padding: 14px 16px; gap: 8px;
+    }
+    .table-header > *:nth-child(n+4) { display: none; }
+    .table-row > *:nth-child(n+3) { grid-column: 2 / -1; font-size: 12px; color: var(--label-tertiary); }
+    .table-row > *:nth-child(3) { text-align: left; grid-row: 2; }
+    .table-row > *:nth-child(4) { grid-row: 3; }
+    .table-row > *:nth-child(5) { grid-row: 4; }
+    .table-row > *:nth-child(6) { grid-row: 5; }
+    .table-row > *:nth-child(7) { grid-row: 6; justify-self: start; }
+
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .log-row { grid-template-columns: 1fr; gap: 4px; }
+    .log-header { display: none; }
+  }
+
+  @media (max-width: 640px) {
+    .app { padding: 0 16px; }
+    .nav { margin: 0 -16px 20px; padding: 0 16px; }
+    .brand-sub { display: none; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card { padding: 14px 16px; }
+    .stat-value { font-size: 26px; }
+    .key-input { font-size: 20px !important; letter-spacing: 3px !important; padding: 16px 12px !important; }
+    .btn { font-size: 13px; padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════ Lock Screen ════════════ -->
+<div id="lock" class="lock">
+  <div class="lock-box">
+    <div class="lock-icon">🔐</div>
+    <h2 id="lock-title">Admin Panel</h2>
+    <p id="lock-subtitle">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
+    <input type="password" id="lock-password" placeholder="Password" autocomplete="off" onkeydown="if(event.key==='Enter') handleLock()">
+    <input type="password" id="lock-confirm" placeholder="ยืนยันรหัสผ่าน" autocomplete="off" class="hidden" onkeydown="if(event.key==='Enter') handleLock()">
+    <button class="lock-btn" id="lock-btn" onclick="handleLock()">เข้าสู่ระบบ</button>
+    <div class="lock-msg" id="lock-msg"></div>
+    <div class="lock-hint" id="lock-hint"></div>
+  </div>
+</div>
+
+<!-- ════════════ Main App ════════════ -->
+<div id="app" class="app hidden">
+  <!-- Navigation -->
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <div class="brand-icon">🔑</div>
+        <div>
+          <div class="brand-title">License Manager</div>
+          <div class="brand-sub" id="connection-info">Connecting...</div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="icon-btn" onclick="openChangePassword()" title="เปลี่ยนรหัสผ่าน">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+        </button>
+        <button class="icon-btn" onclick="logout()" title="ออกจากระบบ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="config-alert" class="alert hidden">
+    <strong>⚠️ ยังไม่ได้ตั้ง PUBLISHABLE_KEY</strong> — แก้ในไฟล์
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card total">
+      <div class="dot"></div>
+      <div class="stat-label">Total</div>
+      <div class="stat-value" id="stat-total">0</div>
+    </div>
+    <div class="stat-card unused">
+      <div class="dot"></div>
+      <div class="stat-label">Unused</div>
+      <div class="stat-value" id="stat-unused">0</div>
+    </div>
+    <div class="stat-card used">
+      <div class="dot"></div>
+      <div class="stat-label">Used</div>
+      <div class="stat-value" id="stat-used">0</div>
+    </div>
+    <div class="stat-card revoked">
+      <div class="dot"></div>
+      <div class="stat-label">Revoked</div>
+      <div class="stat-value" id="stat-revoked">0</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="segmented">
+    <button class="segment active" data-tab="keys" onclick="switchTab('keys')">🔑 รหัสทั้งหมด</button>
+    <button class="segment" data-tab="logs" onclick="switchTab('logs')">📋 ประวัติการใช้</button>
+    <button class="segment" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  </div>
+
+  <!-- ════════════ KEYS TAB ════════════ -->
+  <div id="tab-keys">
+    <div class="toolbar">
+      <div class="search">
+        <span class="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
+        <input type="text" id="search-input" placeholder="ค้นหารหัสหรือหมายเหตุ..." oninput="renderKeys()">
+      </div>
+      <select class="filter-pill" id="status-filter" onchange="renderKeys()">
+        <option value="all">ทุกสถานะ</option>
+        <option value="unused">ยังไม่ใช้</option>
+        <option value="used">ใช้แล้ว</option>
+        <option value="revoked">ยกเลิก</option>
+      </select>
+      <button class="btn btn-primary" onclick="toggleAdd()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        เพิ่มรหัส
+      </button>
+      <button class="btn btn-secondary" onclick="exportCSV()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Export
+      </button>
+      <button class="btn btn-secondary btn-icon-only" onclick="loadKeys()" title="Refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      </button>
+    </div>
+
+    <!-- Add Form -->
+    <div id="add-form" class="add-form hidden">
+      <h3>เพิ่มรหัสใหม่</h3>
+      <div class="sub">รหัส 15 หลัก A-Z และ 0-9</div>
+
+      <div class="mode-segmented">
+        <button class="mode-btn active" data-mode="single" onclick="switchMode('single')">🔑 ทีละ 1</button>
+        <button class="mode-btn" data-mode="multi" onclick="switchMode('multi')">📋 หลายรหัส</button>
+      </div>
+
+      <!-- Single Mode -->
+      <div id="single-mode">
+        <div class="input-group">
+          <div class="input-field" style="flex: 2; min-width: 260px;">
+            <label>รหัส License</label>
+            <input type="text" id="key-input" class="key-input" placeholder="W9FTHPY3X4KDTST" maxlength="15" oninput="handleKeyInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault(); addKey();}" autocomplete="off">
+            <div class="char-count" id="char-count">0 / 15</div>
+          </div>
+          <div class="input-field" style="flex: 2; min-width: 200px;">
+            <label>หมายเหตุ (ไม่บังคับ)</label>
+            <input type="text" id="note-input" placeholder="เช่น ลูกค้า ABC">
+          </div>
+          <button class="btn btn-success" id="add-btn" onclick="addKey()" disabled style="padding: 14px 24px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            บันทึก
+          </button>
+        </div>
+        <div class="input-field" style="margin-top: 14px;">
+          <label>รหัสนี้ใช้ได้กับเวอร์ชันไหน?</label>
+          <div class="version-select" id="single-versions">
+            <label class="version-checkbox none checked"><input type="checkbox" value="_none" checked onchange="handleVersionCheck(this, 'single')">ทุกเวอร์ชัน</label>
+            <label class="version-checkbox"><input type="checkbox" value="v1" onchange="handleVersionCheck(this, 'single')">v1</label>
+            <label class="version-checkbox"><input type="checkbox" value="v2" onchange="handleVersionCheck(this, 'single')">v2</label>
+            <label class="version-checkbox"><input type="checkbox" value="v3" onchange="handleVersionCheck(this, 'single')">v3</label>
+          </div>
+        </div>
+        <div class="validation-msg" id="validation-msg"></div>
+      </div>
+
+      <!-- Multi Mode -->
+      <div id="multi-mode" class="hidden">
+        <div class="input-field">
+          <label>วางรหัสหลายตัว (บรรทัดละ 1 รหัส)</label>
+          <textarea class="multi-textarea" id="multi-keys" oninput="validateMulti()" placeholder="W9FTHPY3X4KDTST&#10;ABC123DEF456GHI&#10;XYZ789QRS012TUV"></textarea>
+          <div class="multi-info">
+            <span class="count" id="multi-count">0 รหัสที่ถูกต้อง</span>
+            <span class="errors" id="multi-errors"></span>
+          </div>
+        </div>
+        <div class="input-field" style="margin-top: 14px;">
+          <label>รหัสทั้งหมดนี้ใช้ได้กับเวอร์ชันไหน?</label>
+          <div class="version-select" id="multi-versions">
+            <label class="version-checkbox none checked"><input type="checkbox" value="_none" checked onchange="handleVersionCheck(this, 'multi')">ทุกเวอร์ชัน</label>
+            <label class="version-checkbox"><input type="checkbox" value="v1" onchange="handleVersionCheck(this, 'multi')">v1</label>
+            <label class="version-checkbox"><input type="checkbox" value="v2" onchange="handleVersionCheck(this, 'multi')">v2</label>
+            <label class="version-checkbox"><input type="checkbox" value="v3" onchange="handleVersionCheck(this, 'multi')">v3</label>
+          </div>
+        </div>
+        <div class="input-group" style="margin-top: 14px;">
+          <div class="input-field" style="flex: 1; min-width: 200px;">
+            <label>หมายเหตุ (ใช้กับทุกรหัส)</label>
+            <input type="text" id="multi-note" placeholder="เช่น Batch 1 - เมษายน">
+          </div>
+          <button class="btn btn-success" id="multi-add-btn" onclick="addMultiKeys()" disabled style="padding: 14px 24px;">บันทึกทั้งหมด</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Bar -->
+    <div id="bulk-bar" class="hidden" style="margin-bottom: 12px;">
+      <div class="bulk-bar" style="border-radius: 12px; border: 0.5px solid var(--blue);">
+        <div>
+          <span class="bulk-count" id="bulk-count">0 รหัสถูกเลือก</span>
+        </div>
+        <div class="bulk-actions">
+          <button class="btn btn-secondary" onclick="bulkEditVersions()">📝 แก้เวอร์ชัน</button>
+          <button class="btn btn-secondary" onclick="bulkRevoke()" style="color: var(--orange);">🚫 ยกเลิกทั้งหมด</button>
+          <button class="btn btn-danger" onclick="bulkDelete()">🗑️ ลบทั้งหมด</button>
+          <button class="btn btn-secondary" onclick="clearSelection()">✕ ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="row-check">
+          <div class="check-box" id="select-all" onclick="toggleSelectAll()"></div>
+        </div>
+        <span>รหัส</span>
+        <span>สถานะ</span>
+        <span>เวอร์ชัน</span>
+        <span>หมายเหตุ</span>
+        <span>ใช้เมื่อ / IP</span>
+        <span style="text-align:right;">จัดการ</span>
+      </div>
+      <div id="keys-body"></div>
+    </div>
+  </div>
+
+  <!-- ════════════ LOGS TAB ════════════ -->
+  <div id="tab-logs" class="hidden">
+    <div class="toolbar">
+      <button class="btn btn-secondary" onclick="loadLogs()" style="margin-left: auto;">🔄 Refresh</button>
+    </div>
+    <div class="table-card">
+      <div class="log-row log-header">
+        <span>เวลา</span>
+        <span>รหัส</span>
+        <span>ผลลัพธ์</span>
+        <span>IP</span>
+        <span>Version</span>
+        <span>ข้อความ / HWID / UA</span>
+      </div>
+      <div id="logs-body"></div>
+    </div>
+  </div>
+
+  <!-- ════════════ DASHBOARD TAB ════════════ -->
+  <div id="tab-dashboard" class="hidden">
+    <div class="dashboard-grid">
+      <div class="dashboard-card">
+        <h3>📈 Activation ต่อวัน (30 วันล่าสุด)</h3>
+        <div class="chart-container">
+          <canvas id="chart-daily"></canvas>
+        </div>
+      </div>
+      <div class="dashboard-card">
+        <h3>📊 Activation ต่อเวอร์ชัน</h3>
+        <div class="chart-container">
+          <canvas id="chart-version"></canvas>
+        </div>
+      </div>
+      <div class="dashboard-card">
+        <h3>🌐 Top 10 IP ที่ใช้</h3>
+        <div class="top-ip-list" id="top-ip-list"></div>
+      </div>
+      <div class="dashboard-card">
+        <h3>⚠️ Invalid Attempts (10 ล่าสุด)</h3>
+        <div class="top-ip-list" id="invalid-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<!-- ════════════ Modals ════════════ -->
+<div id="modal-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ⚠️ ตั้งค่าตรงนี้ (ไม่มี password ในโค้ดแล้ว!)
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://cgvqsrlrkupqpviqgoyp.supabase.co";
+const PUBLISHABLE_KEY = "sb_publishable__GDbeKiRItEZ2SMfSECfJA_MSFtcXyk";
+// ═══════════════════════════════════════════════════════════
+
+const HEADERS = {
+  "apikey": PUBLISHABLE_KEY,
+  "Authorization": "Bearer " + PUBLISHABLE_KEY,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation"
+};
+
+let keysData = [], logsData = [], selectedIds = new Set(), currentTab = "keys", currentMode = "single";
+let validMultiKeys = [], singleVersions = [], multiVersions = [];
+let chartDaily = null, chartVersion = null;
+let isFirstTime = false;
+
+// ═══════════════════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════════════════
+function fmtDate(iso) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleString("th-TH", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit"
+  });
+}
+function fmtDateShort(iso) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleDateString("th-TH", { month: "short", day: "numeric" });
+}
+function toast(msg, type = "success") {
+  const div = document.createElement("div");
+  div.className = "toast " + type;
+  div.textContent = (type === "success" ? "✅ " : "❌ ") + msg;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+function checkConfig() {
+  const ok = PUBLISHABLE_KEY && PUBLISHABLE_KEY.indexOf("sb_publishable_") === 0;
+  document.getElementById("config-alert").classList.toggle("hidden", ok);
+  document.getElementById("footer").textContent = "Connected to: " + SUPABASE_URL.replace("https://","").replace(".supabase.co","");
+  document.getElementById("connection-info").textContent = "Connected · " + SUPABASE_URL.split("//")[1].split(".")[0].substring(0, 8) + "...";
+  return ok;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RPC Call helper
+// ═══════════════════════════════════════════════════════════
+async function rpc(fnName, params) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: "POST",
+    headers: HEADERS,
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lock Screen - Check if first time, then show appropriate UI
+// ═══════════════════════════════════════════════════════════
+async function initLockScreen() {
+  if (!checkConfig()) return;
+  try {
+    // ลอง verify ด้วย empty string เพื่อดูว่ามี password อยู่ไหม
+    const result = await rpc("verify_admin_password", { input_password: "" });
+    if (result.first_time) {
+      isFirstTime = true;
+      document.getElementById("lock-title").textContent = "ตั้งรหัสผ่านครั้งแรก";
+      document.getElementById("lock-subtitle").textContent = "กรุณาตั้งรหัสผ่านสำหรับ Admin (อย่างน้อย 6 ตัวอักษร)";
+      document.getElementById("lock-password").placeholder = "รหัสผ่านใหม่";
+      document.getElementById("lock-confirm").classList.remove("hidden");
+      document.getElementById("lock-btn").textContent = "ตั้งรหัสผ่าน";
+      document.getElementById("lock-hint").innerHTML = "🔒 Password จะถูก hash ด้วย SHA-256 และเก็บบน Supabase<br>ไม่มีการเก็บ password ในโค้ดฝั่ง client";
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  document.getElementById("lock-password").focus();
+}
+
+async function handleLock() {
+  const pwInput = document.getElementById("lock-password");
+  const confirmInput = document.getElementById("lock-confirm");
+  const msgEl = document.getElementById("lock-msg");
+  const btn = document.getElementById("lock-btn");
+
+  const pw = pwInput.value;
+
+  if (isFirstTime) {
+    // ตั้ง password ครั้งแรก
+    if (pw.length < 6) {
+      pwInput.classList.add("error");
+      msgEl.textContent = "❌ รหัสผ่านต้องยาวอย่างน้อย 6 ตัว";
+      setTimeout(() => pwInput.classList.remove("error"), 500);
+      return;
+    }
+    if (pw !== confirmInput.value) {
+      confirmInput.classList.add("error");
+      msgEl.textContent = "❌ รหัสผ่านไม่ตรงกัน";
+      setTimeout(() => confirmInput.classList.remove("error"), 500);
+      return;
+    }
+    btn.disabled = true; btn.textContent = "กำลังตั้งรหัส...";
+    try {
+      const result = await rpc("set_admin_password", { old_password: "", new_password: pw });
+      if (result.success) {
+        msgEl.textContent = "✅ ตั้งรหัสผ่านสำเร็จ";
+        msgEl.className = "lock-msg ok";
+        setTimeout(() => { unlock(pw); }, 800);
+      } else {
+        msgEl.textContent = "❌ " + result.message;
+        btn.disabled = false; btn.textContent = "ตั้งรหัสผ่าน";
+      }
+    } catch (e) {
+      msgEl.textContent = "❌ " + e.message;
+      btn.disabled = false; btn.textContent = "ตั้งรหัสผ่าน";
+    }
+    return;
+  }
+
+  // เข้าสู่ระบบ
+  if (!pw) {
+    pwInput.classList.add("error");
+    msgEl.textContent = "กรุณาใส่รหัสผ่าน";
+    setTimeout(() => pwInput.classList.remove("error"), 500);
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "กำลังตรวจสอบ...";
+  try {
+    const result = await rpc("verify_admin_password", { input_password: pw });
+    if (result.valid) {
+      unlock(pw);
+    } else {
+      pwInput.classList.add("error");
+      msgEl.textContent = "❌ " + result.message;
+      setTimeout(() => pwInput.classList.remove("error"), 500);
+      btn.disabled = false; btn.textContent = "เข้าสู่ระบบ";
+      pwInput.value = ""; pwInput.focus();
+    }
+  } catch (e) {
+    msgEl.textContent = "❌ " + e.message;
+    btn.disabled = false; btn.textContent = "เข้าสู่ระบบ";
+  }
+}
+
+function unlock(pw) {
+  try { sessionStorage.setItem("admin_unlocked", "1"); sessionStorage.setItem("admin_pw", pw); } catch(e){}
+  document.getElementById("lock").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  init();
+}
+
+function logout() {
+  try { sessionStorage.removeItem("admin_unlocked"); sessionStorage.removeItem("admin_pw"); } catch(e){}
+  location.reload();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Change Password Modal
+// ═══════════════════════════════════════════════════════════
+function openChangePassword() {
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>🔑 เปลี่ยนรหัสผ่าน</h3>
+        <div class="input-field" style="margin-bottom: 12px;">
+          <label>รหัสผ่านเก่า</label>
+          <input type="password" id="old-pw" autocomplete="off">
+        </div>
+        <div class="input-field" style="margin-bottom: 12px;">
+          <label>รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)</label>
+          <input type="password" id="new-pw" autocomplete="off">
+        </div>
+        <div class="input-field">
+          <label>ยืนยันรหัสผ่านใหม่</label>
+          <input type="password" id="new-pw2" autocomplete="off">
+        </div>
+        <div id="pw-msg" style="margin-top: 10px; min-height: 18px; font-size: 13px; color: var(--red);"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="doChangePassword()">เปลี่ยน</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("modal-container").innerHTML = html;
+  setTimeout(() => document.getElementById("old-pw").focus(), 100);
+}
+
+async function doChangePassword() {
+  const oldPw = document.getElementById("old-pw").value;
+  const newPw = document.getElementById("new-pw").value;
+  const newPw2 = document.getElementById("new-pw2").value;
+  const msg = document.getElementById("pw-msg");
+
+  if (newPw.length < 6) { msg.textContent = "❌ รหัสใหม่ต้องยาวอย่างน้อย 6 ตัว"; return; }
+  if (newPw !== newPw2) { msg.textContent = "❌ รหัสใหม่ไม่ตรงกัน"; return; }
+
+  try {
+    const result = await rpc("set_admin_password", { old_password: oldPw, new_password: newPw });
+    if (result.success) {
+      toast("เปลี่ยนรหัสผ่านสำเร็จ");
+      closeModal();
+      try { sessionStorage.setItem("admin_pw", newPw); } catch(e){}
+    } else {
+      msg.textContent = "❌ " + result.message;
+    }
+  } catch (e) {
+    msg.textContent = "❌ " + e.message;
+  }
+}
+
+function closeModal() {
+  document.getElementById("modal-container").innerHTML = "";
+}
+
+// ═══════════════════════════════════════════════════════════
+// Load Data
+// ═══════════════════════════════════════════════════════════
+async function loadKeys() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?select=*&order=created_at.desc&limit=2000`, { headers: HEADERS });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    keysData = await res.json();
+    renderKeys();
+    renderStats();
+    updateValidation();
+  } catch (e) { toast("โหลดรหัสไม่ได้: " + e.message, "error"); }
+}
+
+async function loadLogs() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/usage_logs?select=*&order=created_at.desc&limit=1000`, { headers: HEADERS });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    logsData = await res.json();
+    renderLogs();
+  } catch (e) { toast("โหลด log ไม่ได้: " + e.message, "error"); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Stats
+// ═══════════════════════════════════════════════════════════
+function renderStats() {
+  const s = {
+    total: keysData.length,
+    unused: keysData.filter(k => k.status === "unused").length,
+    used: keysData.filter(k => k.status === "used").length,
+    revoked: keysData.filter(k => k.status === "revoked").length
+  };
+  document.getElementById("stat-total").textContent = s.total;
+  document.getElementById("stat-unused").textContent = s.unused;
+  document.getElementById("stat-used").textContent = s.used;
+  document.getElementById("stat-revoked").textContent = s.revoked;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render Keys Table
+// ═══════════════════════════════════════════════════════════
+function renderKeys() {
+  const search = document.getElementById("search-input").value.toLowerCase();
+  const filter = document.getElementById("status-filter").value;
+
+  const filtered = keysData.filter(k => {
+    if (filter !== "all" && k.status !== filter) return false;
+    if (search && !k.key.toLowerCase().includes(search) && !(k.note||"").toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const body = document.getElementById("keys-body");
+  if (filtered.length === 0) {
+    body.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>${keysData.length === 0 ? 'ยังไม่มีรหัส<br>กด "＋ เพิ่มรหัส" เพื่อเริ่มต้น' : 'ไม่พบรหัสที่ค้นหา'}</div>`;
+    updateBulkBar();
+    return;
+  }
+
+  body.innerHTML = filtered.map(k => {
+    const statusText = {unused:"ยังไม่ใช้",used:"ใช้แล้ว",revoked:"ยกเลิก"}[k.status];
+    const keyClass = k.status === "unused" ? "key-unused" : "key-used";
+    const used = k.used_at ? `${fmtDate(k.used_at)}<br><span class="ip">${k.used_ip||'-'}</span>` : "-";
+
+    let versionsHtml = '';
+    if (!k.allowed_versions || k.allowed_versions.length === 0) {
+      versionsHtml = `<span class="version-pill all" onclick="editVersions(${k.id})">ทุกเวอร์ชัน</span>`;
+    } else {
+      versionsHtml = k.allowed_versions.map(v => `<span class="version-pill" onclick="editVersions(${k.id})">${v}</span>`).join('');
+    }
+
+    const actions = [
+      k.status === "unused" ? `<button class="action-btn action-revoke" onclick="revokeKey(${k.id},'${k.key}')">ยกเลิก</button>` : '',
+      `<button class="action-btn action-delete" onclick="deleteKey(${k.id},'${k.key}')">ลบ</button>`
+    ].join('');
+
+    const selected = selectedIds.has(k.id) ? "selected" : "";
+    const checked = selectedIds.has(k.id) ? "checked" : "";
+
+    return `
+      <div class="table-row ${selected}">
+        <div class="row-check">
+          <div class="check-box ${checked}" onclick="toggleSelect(${k.id})"></div>
+        </div>
+        <span class="key-code ${keyClass}" onclick="copyKey('${k.key}', this)" title="คลิกเพื่อคัดลอก">${k.key}</span>
+        <span><span class="badge badge-${k.status}">${statusText}</span></span>
+        <span>${versionsHtml}</span>
+        <span class="note-text">${k.note || "-"}</span>
+        <span class="used-info">${used}</span>
+        <div class="actions">${actions}</div>
+      </div>`;
+  }).join('');
+
+  updateBulkBar();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Bulk Selection
+// ═══════════════════════════════════════════════════════════
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  renderKeys();
+}
+
+function toggleSelectAll() {
+  const filtered = getFilteredKeys();
+  if (filtered.every(k => selectedIds.has(k.id))) {
+    filtered.forEach(k => selectedIds.delete(k.id));
+  } else {
+    filtered.forEach(k => selectedIds.add(k.id));
+  }
+  renderKeys();
+}
+
+function getFilteredKeys() {
+  const search = document.getElementById("search-input").value.toLowerCase();
+  const filter = document.getElementById("status-filter").value;
+  return keysData.filter(k => {
+    if (filter !== "all" && k.status !== filter) return false;
+    if (search && !k.key.toLowerCase().includes(search) && !(k.note||"").toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  renderKeys();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById("bulk-bar");
+  if (selectedIds.size === 0) {
+    bar.classList.add("hidden");
+  } else {
+    bar.classList.remove("hidden");
+    document.getElementById("bulk-count").textContent = `${selectedIds.size} รหัสถูกเลือก`;
+  }
+
+  // Update select-all checkbox
+  const filtered = getFilteredKeys();
+  const selectAll = document.getElementById("select-all");
+  if (filtered.length > 0 && filtered.every(k => selectedIds.has(k.id))) {
+    selectAll.classList.add("checked");
+  } else {
+    selectAll.classList.remove("checked");
+  }
+}
+
+async function bulkRevoke() {
+  if (!confirm(`ยกเลิก ${selectedIds.size} รหัสทั้งหมด?`)) return;
+  try {
+    const ids = [...selectedIds].join(",");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?id=in.(${ids})`, {
+      method: "PATCH", headers: HEADERS, body: JSON.stringify({ status: "revoked" })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`ยกเลิก ${selectedIds.size} รหัสแล้ว`);
+    selectedIds.clear();
+    await loadKeys();
+  } catch (e) { toast("ยกเลิกไม่สำเร็จ: " + e.message, "error"); }
+}
+
+async function bulkDelete() {
+  if (!confirm(`ลบ ${selectedIds.size} รหัสถาวร?\nไม่สามารถเรียกคืนได้`)) return;
+  try {
+    const ids = [...selectedIds].join(",");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?id=in.(${ids})`, {
+      method: "DELETE", headers: HEADERS
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`ลบ ${selectedIds.size} รหัสแล้ว`);
+    selectedIds.clear();
+    await loadKeys();
+  } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
+}
+
+function bulkEditVersions() {
+  editVersionsMulti([...selectedIds]);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Edit Versions
+// ═══════════════════════════════════════════════════════════
+function editVersions(id) {
+  editVersionsMulti([id]);
+}
+
+function editVersionsMulti(ids) {
+  const current = ids.length === 1 ? (keysData.find(k => k.id === ids[0])?.allowed_versions || []) : [];
+  const isAll = current.length === 0;
+
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>📝 แก้ไขเวอร์ชันที่อนุญาต</h3>
+        <p style="color: var(--label-secondary); font-size: 13px; margin-bottom: 16px;">
+          ${ids.length === 1 ? `รหัส: <code>${keysData.find(k => k.id === ids[0])?.key}</code>` : `จะแก้ไข ${ids.length} รหัสพร้อมกัน`}
+        </p>
+        <div class="version-select" id="edit-versions">
+          <label class="version-checkbox none ${isAll ? 'checked' : ''}"><input type="checkbox" value="_none" ${isAll ? 'checked' : ''} onchange="handleEditVersionCheck(this)">ทุกเวอร์ชัน</label>
+          <label class="version-checkbox ${current.includes('v1') ? 'checked' : ''}"><input type="checkbox" value="v1" ${current.includes('v1') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v1</label>
+          <label class="version-checkbox ${current.includes('v2') ? 'checked' : ''}"><input type="checkbox" value="v2" ${current.includes('v2') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v2</label>
+          <label class="version-checkbox ${current.includes('v3') ? 'checked' : ''}"><input type="checkbox" value="v3" ${current.includes('v3') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v3</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick='doSaveVersions(${JSON.stringify(ids)})'>บันทึก</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("modal-container").innerHTML = html;
+}
+
+function handleEditVersionCheck(el) {
+  const container = document.getElementById("edit-versions");
+  const noneBox = container.querySelector('.version-checkbox.none');
+  const versionBoxes = container.querySelectorAll('.version-checkbox:not(.none)');
+
+  if (el.value === "_none" && el.checked) {
+    // เลือก "ทุกเวอร์ชัน" → ยกเลิกตัวอื่น
+    versionBoxes.forEach(b => {
+      b.classList.remove('checked');
+      b.querySelector('input').checked = false;
+    });
+    noneBox.classList.add('checked');
+  } else if (el.value !== "_none" && el.checked) {
+    // เลือก version → ยกเลิก "ทุกเวอร์ชัน"
+    noneBox.classList.remove('checked');
+    noneBox.querySelector('input').checked = false;
+    el.parentElement.classList.add('checked');
+  } else {
+    // uncheck
+    el.parentElement.classList.remove('checked');
+
+    // ถ้าไม่เหลืออะไรเลย → กลับมาที่ "ทุกเวอร์ชัน"
+    const anyChecked = [...versionBoxes].some(b => b.querySelector('input').checked);
+    if (!anyChecked) {
+      noneBox.classList.add('checked');
+      noneBox.querySelector('input').checked = true;
+    }
+  }
+}
+
+async function doSaveVersions(ids) {
+  const container = document.getElementById("edit-versions");
+  const noneChecked = container.querySelector('.version-checkbox.none input').checked;
+  let versions = null;
+  if (!noneChecked) {
+    versions = [];
+    container.querySelectorAll('.version-checkbox:not(.none) input:checked').forEach(i => versions.push(i.value));
+    if (versions.length === 0) versions = null;
+  }
+
+  try {
+    const idList = ids.join(",");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?id=in.(${idList})`, {
+      method: "PATCH", headers: HEADERS,
+      body: JSON.stringify({ allowed_versions: versions })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`บันทึก ${ids.length} รหัสแล้ว`);
+    closeModal();
+    selectedIds.clear();
+    await loadKeys();
+  } catch (e) { toast("บันทึกไม่สำเร็จ: " + e.message, "error"); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Version Checkboxes (add form)
+// ═══════════════════════════════════════════════════════════
+function handleVersionCheck(el, mode) {
+  const container = document.getElementById(mode + '-versions');
+  const noneBox = container.querySelector('.version-checkbox.none');
+  const versionBoxes = container.querySelectorAll('.version-checkbox:not(.none)');
+
+  if (el.value === "_none" && el.checked) {
+    versionBoxes.forEach(b => {
+      b.classList.remove('checked');
+      b.querySelector('input').checked = false;
+    });
+    noneBox.classList.add('checked');
+  } else if (el.value !== "_none" && el.checked) {
+    noneBox.classList.remove('checked');
+    noneBox.querySelector('input').checked = false;
+    el.parentElement.classList.add('checked');
+  } else {
+    el.parentElement.classList.remove('checked');
+    const anyChecked = [...versionBoxes].some(b => b.querySelector('input').checked);
+    if (!anyChecked) {
+      noneBox.classList.add('checked');
+      noneBox.querySelector('input').checked = true;
+    }
+  }
+}
+
+function getSelectedVersions(mode) {
+  const container = document.getElementById(mode + '-versions');
+  const noneChecked = container.querySelector('.version-checkbox.none input').checked;
+  if (noneChecked) return null;
+  const versions = [];
+  container.querySelectorAll('.version-checkbox:not(.none) input:checked').forEach(i => versions.push(i.value));
+  return versions.length > 0 ? versions : null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Single Key Input
+// ═══════════════════════════════════════════════════════════
+function handleKeyInput(input) {
+  const cursorPos = input.selectionStart;
+  const originalLen = input.value.length;
+  const cleaned = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  input.value = cleaned;
+  const diff = originalLen - cleaned.length;
+  input.setSelectionRange(cursorPos - diff, cursorPos - diff);
+  updateValidation();
+}
+
+function updateValidation() {
+  const input = document.getElementById("key-input");
+  if (!input) return;
+  const key = input.value, len = key.length;
+  const countEl = document.getElementById("char-count");
+  const msgEl = document.getElementById("validation-msg");
+  const btn = document.getElementById("add-btn");
+
+  countEl.textContent = len + " / 15";
+
+  if (len === 0) {
+    input.className = "key-input"; countEl.className = "char-count";
+    msgEl.textContent = ""; msgEl.className = "validation-msg";
+    btn.disabled = true; return;
+  }
+  if (len < 15) {
+    input.className = "key-input invalid"; countEl.className = "char-count invalid";
+    msgEl.textContent = `⚠ รหัสต้องมี 15 หลัก (ขาดอีก ${15-len} ตัว)`;
+    msgEl.className = "validation-msg"; btn.disabled = true; return;
+  }
+  const dup = keysData.find(k => k.key === key);
+  if (dup) {
+    input.className = "key-input invalid"; countEl.className = "char-count invalid";
+    msgEl.textContent = `❌ รหัสนี้มีในระบบแล้ว (${dup.status})`;
+    msgEl.className = "validation-msg"; btn.disabled = true; return;
+  }
+  input.className = "key-input valid"; countEl.className = "char-count valid";
+  msgEl.textContent = "✓ รหัสพร้อมบันทึก"; msgEl.className = "validation-msg ok";
+  btn.disabled = false;
+}
+
+async function addKey() {
+  const key = document.getElementById("key-input").value;
+  const note = document.getElementById("note-input").value;
+  const btn = document.getElementById("add-btn");
+  if (key.length !== 15) return;
+
+  btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+  try {
+    const versions = getSelectedVersions('single');
+    const res = await fetch(SUPABASE_URL + "/rest/v1/license_keys", {
+      method: "POST", headers: HEADERS,
+      body: JSON.stringify({ key, note: note || "", allowed_versions: versions })
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (t.includes("duplicate") || t.includes("unique")) throw new Error("รหัสนี้มีอยู่แล้ว");
+      throw new Error(t);
+    }
+    toast("บันทึกรหัส " + key + " แล้ว");
+    document.getElementById("key-input").value = "";
+    document.getElementById("note-input").value = "";
+    await loadKeys();
+    document.getElementById("key-input").focus();
+  } catch (e) { toast("บันทึกไม่สำเร็จ: " + e.message, "error"); }
+  btn.disabled = false; btn.textContent = "บันทึก";
+  updateValidation();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Multi Key
+// ═══════════════════════════════════════════════════════════
+function validateMulti() {
+  const raw = document.getElementById("multi-keys").value;
+  const lines = raw.split("\n").map(l => l.trim().toUpperCase().replace(/[^A-Z0-9]/g,"")).filter(l => l.length > 0);
+
+  let valid = [], errCount = 0, dupCount = 0;
+  const seen = new Set();
+
+  lines.forEach(line => {
+    if (line.length !== 15) { errCount++; return; }
+    if (seen.has(line)) { dupCount++; return; }
+    if (keysData.find(k => k.key === line)) { dupCount++; return; }
+    seen.add(line);
+    valid.push(line);
+  });
+
+  validMultiKeys = valid;
+  document.getElementById("multi-count").textContent = `${valid.length} รหัสที่ถูกต้อง`;
+  let errs = [];
+  if (errCount > 0) errs.push(`${errCount} ไม่ครบ 15 หลัก`);
+  if (dupCount > 0) errs.push(`${dupCount} ซ้ำ`);
+  document.getElementById("multi-errors").textContent = errs.length > 0 ? "⚠ " + errs.join(", ") : "";
+  document.getElementById("multi-add-btn").disabled = valid.length === 0;
+  document.getElementById("multi-add-btn").textContent = valid.length > 0 ? `บันทึก ${valid.length} รหัส` : "บันทึกทั้งหมด";
+}
+
+async function addMultiKeys() {
+  if (validMultiKeys.length === 0) return;
+  const note = document.getElementById("multi-note").value;
+  const btn = document.getElementById("multi-add-btn");
+  btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+  try {
+    const versions = getSelectedVersions('multi');
+    const batch = validMultiKeys.map(key => ({ key, note: note || "", allowed_versions: versions }));
+    const res = await fetch(SUPABASE_URL + "/rest/v1/license_keys", {
+      method: "POST", headers: HEADERS, body: JSON.stringify(batch)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`บันทึก ${validMultiKeys.length} รหัสแล้ว`);
+    document.getElementById("multi-keys").value = "";
+    document.getElementById("multi-note").value = "";
+    validMultiKeys = [];
+    validateMulti();
+    await loadKeys();
+  } catch (e) { toast("บันทึกไม่สำเร็จ: " + e.message, "error"); }
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Logs
+// ═══════════════════════════════════════════════════════════
+function renderLogs() {
+  const body = document.getElementById("logs-body");
+  if (logsData.length === 0) {
+    body.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>ยังไม่มีประวัติการใช้</div>';
+    return;
+  }
+  const sm = {
+    success: "✓ สำเร็จ", invalid: "✗ ผิด",
+    already_used: "◉ ใช้แล้ว", revoked: "⊘ ยกเลิก",
+    wrong_version: "⚠ เวอร์ชันผิด"
+  };
+  body.innerHTML = logsData.map(l => {
+    let extraInfo = l.message || '';
+    if (l.hwid) extraInfo += `<br><span style="color:var(--label-tertiary);font-size:10px;">HWID: ${l.hwid.substring(0,16)}</span>`;
+    return `
+    <div class="log-row">
+      <span class="log-time">${fmtDate(l.created_at)}</span>
+      <span class="log-key">${l.key_attempted}</span>
+      <span class="log-status status-${l.status}">${sm[l.status] || l.status}</span>
+      <span class="log-ip">${l.ip || '-'}</span>
+      <span class="log-version">${l.version || '-'}</span>
+      <span class="log-msg">${extraInfo}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Dashboard
+// ═══════════════════════════════════════════════════════════
+async function renderDashboard() {
+  await loadLogs();
+  renderChartDaily();
+  renderChartVersion();
+  renderTopIPs();
+  renderInvalidAttempts();
+}
+
+function renderChartDaily() {
+  // นับ success logs ต่อวัน 30 วันล่าสุด
+  const now = new Date();
+  const days = [];
+  const counts = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(0,0,0,0);
+    const next = new Date(d); next.setDate(next.getDate()+1);
+    const count = logsData.filter(l => {
+      if (l.status !== 'success') return false;
+      const t = new Date(l.created_at);
+      return t >= d && t < next;
+    }).length;
+    days.push(d.toLocaleDateString("th-TH", {month:"short",day:"numeric"}));
+    counts.push(count);
+  }
+
+  const ctx = document.getElementById("chart-daily");
+  if (chartDaily) chartDaily.destroy();
+  chartDaily = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'Activations',
+        data: counts,
+        borderColor: '#0A84FF',
+        backgroundColor: 'rgba(10,132,255,0.15)',
+        tension: 0.35,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: 'rgba(235,235,245,0.6)', precision: 0 }, grid: { color: 'rgba(84,84,88,0.3)' } },
+        x: { ticks: { color: 'rgba(235,235,245,0.6)', maxRotation: 0, autoSkipPadding: 20 }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderChartVersion() {
+  const versionCounts = {};
+  logsData.filter(l => l.status === 'success').forEach(l => {
+    const v = l.version || 'unknown';
+    versionCounts[v] = (versionCounts[v] || 0) + 1;
+  });
+
+  const labels = Object.keys(versionCounts);
+  const data = Object.values(versionCounts);
+
+  const ctx = document.getElementById("chart-version");
+  if (chartVersion) chartVersion.destroy();
+  if (labels.length === 0) {
+    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+    return;
+  }
+  chartVersion = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: ['#0A84FF','#30D158','#FF9F0A','#BF5AF2','#FFD60A','#FF453A'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: 'rgba(235,235,245,0.8)', padding: 12, font: {size: 12} } } }
+    }
+  });
+}
+
+function renderTopIPs() {
+  const ipCounts = {};
+  logsData.filter(l => l.status === 'success' && l.ip).forEach(l => {
+    ipCounts[l.ip] = (ipCounts[l.ip] || 0) + 1;
+  });
+  const sorted = Object.entries(ipCounts).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const list = document.getElementById("top-ip-list");
+  if (sorted.length === 0) {
+    list.innerHTML = '<div class="empty" style="padding: 20px;">ยังไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = sorted.map(([ip,count]) => `
+    <div class="top-ip-row">
+      <span class="top-ip-addr">${ip}</span>
+      <span class="top-ip-count">${count} ครั้ง</span>
+    </div>
+  `).join('');
+}
+
+function renderInvalidAttempts() {
+  const invalid = logsData.filter(l => l.status === 'invalid' || l.status === 'wrong_version').slice(0,10);
+  const list = document.getElementById("invalid-list");
+  if (invalid.length === 0) {
+    list.innerHTML = '<div class="empty" style="padding: 20px;">ไม่มี invalid attempts 👍</div>';
+    return;
+  }
+  list.innerHTML = invalid.map(l => `
+    <div class="top-ip-row">
+      <div>
+        <div style="font-family:'SF Mono',monospace;font-size:12px;color:var(--red);">${l.key_attempted}</div>
+        <div style="font-size:11px;color:var(--label-tertiary);margin-top:2px;">${fmtDate(l.created_at)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--label-tertiary);font-family:'SF Mono',monospace;">${l.ip||'-'}</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Actions
+// ═══════════════════════════════════════════════════════════
+async function revokeKey(id, key) {
+  if (!confirm(`ยกเลิกรหัส ${key} ?`)) return;
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/license_keys?id=eq." + id, {
+      method: "PATCH", headers: HEADERS, body: JSON.stringify({ status: "revoked" })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast("ยกเลิกรหัสแล้ว");
+    await loadKeys();
+  } catch (e) { toast("ยกเลิกไม่สำเร็จ: " + e.message, "error"); }
+}
+
+async function deleteKey(id, key) {
+  if (!confirm(`ลบรหัส ${key} ถาวร?`)) return;
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/license_keys?id=eq." + id, {
+      method: "DELETE", headers: HEADERS
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast("ลบรหัสแล้ว");
+    await loadKeys();
+  } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
+}
+
+function copyKey(key, el) {
+  navigator.clipboard.writeText(key);
+  const orig = el.textContent;
+  el.textContent = "✓ คัดลอก!";
+  setTimeout(() => el.textContent = orig, 1200);
+}
+
+function exportCSV() {
+  const rows = [["Key","Status","Versions","Note","Created","Used At","Used IP"]];
+  keysData.forEach(k => {
+    rows.push([
+      k.key, k.status,
+      (k.allowed_versions && k.allowed_versions.length > 0) ? k.allowed_versions.join("|") : "all",
+      k.note||"", fmtDate(k.created_at), fmtDate(k.used_at), k.used_ip||""
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `license_keys_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Tabs & Forms
+// ═══════════════════════════════════════════════════════════
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.segment').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  ['keys','logs','dashboard'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', tab !== t);
+  });
+  if (tab === "keys") loadKeys();
+  else if (tab === "logs") loadLogs();
+  else if (tab === "dashboard") renderDashboard();
+}
+
+function toggleAdd() {
+  const f = document.getElementById("add-form");
+  f.classList.toggle("hidden");
+  if (!f.classList.contains("hidden")) {
+    if (currentMode === "single") document.getElementById("key-input").focus();
+    else document.getElementById("multi-keys").focus();
+  }
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById("single-mode").classList.toggle("hidden", mode !== "single");
+  document.getElementById("multi-mode").classList.toggle("hidden", mode !== "multi");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════
+function init() {
+  checkConfig();
+  loadKeys();
+}
+
+// Auto-unlock if session exists
+try {
+  if (sessionStorage.getItem("admin_unlocked") === "1") {
+    document.getElementById("lock").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    init();
+  } else {
+    initLockScreen();
+  }
+} catch(e) { initLockScreen(); }
+</script>
+</body>
+</html>

@@ -480,6 +480,17 @@
   .log-status { font-weight: 600; font-size: 11px; }
   .log-note { color: var(--label-secondary); font-size: 11px; }
   .log-ip { color: var(--label-tertiary); font-family: 'SF Mono', monospace; font-size: 11px; }
+  .hwid-cell {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: var(--blue);
+    cursor: help;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    display: block;
+  }
   .log-version { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--blue); }
   .log-msg { font-size: 11px; color: var(--label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1165,7 +1176,7 @@ function renderKeys() {
       const shortHwid = k.bound_hwid;
       const reactCount = k.reactivation_count || 0;
       const reactBadge = reactCount > 0 ? `<span style="font-size:10px; color:var(--label-tertiary); margin-left:4px;">(${reactCount}x)</span>` : '';
-      hwidHtml = `<span class="hwid-bound" title="${k.bound_hwid}\nผูกเมื่อ: ${k.bound_at ? fmtDate(k.bound_at) : '-'}\nติดตั้งซ้ำ: ${reactCount} ครั้ง" style="font-family:'SF Mono',Menlo,Consolas,monospace; font-size:11px; color:var(--blue); cursor:help;">${shortHwid}${reactBadge}</span>`;
+      hwidHtml = `<span class="hwid-cell" title="${k.bound_hwid}\nผูกเมื่อ: ${k.bound_at ? fmtDate(k.bound_at) : '-'}\nติดตั้งซ้ำ: ${reactCount} ครั้ง">${shortHwid}${reactBadge}</span>`;
     } else {
       hwidHtml = `<span style="color:var(--label-tertiary); font-size:12px;">ยังไม่ผูก</span>`;
     }
@@ -1671,7 +1682,7 @@ function renderLogs() {
       <span class="log-status status-${l.status}">${sm[l.status] || l.status}</span>
       <span class="log-note">${note}</span>
       <span class="log-ip">${l.ip || '-'}</span>
-      <span class="log-ip" title="${l.hwid || ''}">${l.hwid || '-'}</span>
+      <span class="hwid-cell" title="${l.hwid || ''}">${l.hwid || '-'}</span>
       <div class="actions">
         <button class="action-btn action-delete" onclick="deleteLog(${l.id})" title="ลบ log นี้">ลบ</button>
       </div>

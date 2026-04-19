@@ -355,7 +355,7 @@
 
   .table-header, .table-row {
     display: grid;
-    grid-template-columns: 32px 1.5fr 90px 100px 1fr 120px 1fr 130px;
+    grid-template-columns: 32px 1.5fr 90px 100px 1fr 1.2fr 1fr 130px;
     align-items: center; padding: 12px 20px; gap: 12px;
   }
   .table-header {
@@ -464,7 +464,7 @@
   /* ════════════ Logs ════════════ */
   .log-row {
     display: grid;
-    grid-template-columns: 32px 140px 1.2fr 100px 1fr 100px 80px;
+    grid-template-columns: 32px 140px 1fr 100px 1fr 100px 1.2fr 80px;
     align-items: center; padding: 12px 20px; gap: 10px;
     border-bottom: 0.5px solid var(--separator);
     font-size: 12px;
@@ -822,6 +822,7 @@
         <span>ผลลัพธ์</span>
         <span>หมายเหตุ</span>
         <span>IP</span>
+        <span>HWID</span>
         <span>จัดการ</span>
       </div>
       <div id="logs-body"></div>
@@ -1161,7 +1162,7 @@ function renderKeys() {
     // HWID cell
     let hwidHtml;
     if (k.bound_hwid) {
-      const shortHwid = k.bound_hwid.substring(0, 8) + '...';
+      const shortHwid = k.bound_hwid;
       const reactCount = k.reactivation_count || 0;
       const reactBadge = reactCount > 0 ? `<span style="font-size:10px; color:var(--label-tertiary); margin-left:4px;">(${reactCount}x)</span>` : '';
       hwidHtml = `<span class="hwid-bound" title="${k.bound_hwid}\nผูกเมื่อ: ${k.bound_at ? fmtDate(k.bound_at) : '-'}\nติดตั้งซ้ำ: ${reactCount} ครั้ง" style="font-family:'SF Mono',Menlo,Consolas,monospace; font-size:11px; color:var(--blue); cursor:help;">${shortHwid}${reactBadge}</span>`;
@@ -1670,6 +1671,7 @@ function renderLogs() {
       <span class="log-status status-${l.status}">${sm[l.status] || l.status}</span>
       <span class="log-note">${note}</span>
       <span class="log-ip">${l.ip || '-'}</span>
+      <span class="log-ip" title="${l.hwid || ''}">${l.hwid || '-'}</span>
       <div class="actions">
         <button class="action-btn action-delete" onclick="deleteLog(${l.id})" title="ลบ log นี้">ลบ</button>
       </div>

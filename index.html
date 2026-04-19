@@ -355,7 +355,7 @@
 
   .table-header, .table-row {
     display: grid;
-    grid-template-columns: 32px 1.5fr 90px 110px 1fr 1fr 110px;
+    grid-template-columns: 32px 1.5fr 90px 100px 1fr 120px 1fr 130px;
     align-items: center; padding: 12px 20px; gap: 12px;
   }
   .table-header {
@@ -450,6 +450,10 @@
   .action-revoke:hover { background: var(--orange-dim); }
   .action-delete { color: var(--red); border-color: rgba(255,69,58,0.4); }
   .action-delete:hover { background: var(--red-dim); }
+  .action-reset { color: var(--blue); border-color: rgba(10,132,255,0.4); }
+  .action-reset:hover { background: var(--blue-dim); }
+  .action-edit { color: var(--purple); border-color: rgba(191,90,242,0.4); }
+  .action-edit:hover { background: rgba(191,90,242,0.15); }
 
   .empty {
     padding: 60px 20px; text-align: center;
@@ -460,11 +464,12 @@
   /* ════════════ Logs ════════════ */
   .log-row {
     display: grid;
-    grid-template-columns: 150px 1.3fr 110px 120px 80px 1fr;
-    align-items: center; padding: 12px 20px; gap: 12px;
+    grid-template-columns: 32px 140px 1.2fr 100px 1fr 100px 80px;
+    align-items: center; padding: 12px 20px; gap: 10px;
     border-bottom: 0.5px solid var(--separator);
     font-size: 12px;
   }
+  .log-row.selected { background: rgba(10,132,255,0.08); }
   .log-header {
     background: rgba(255,255,255,0.02);
     font-weight: 600; color: var(--label-tertiary);
@@ -473,6 +478,7 @@
   .log-time { color: var(--label-secondary); font-family: 'SF Mono', monospace; font-size: 11px; }
   .log-key { color: var(--label-secondary); font-family: 'SF Mono', monospace; font-size: 12px; }
   .log-status { font-weight: 600; font-size: 11px; }
+  .log-note { color: var(--label-secondary); font-size: 11px; }
   .log-ip { color: var(--label-tertiary); font-family: 'SF Mono', monospace; font-size: 11px; }
   .log-version { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--blue); }
   .log-msg { font-size: 11px; color: var(--label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -577,10 +583,12 @@
     .table-row > *:nth-child(4) { grid-row: 3; }
     .table-row > *:nth-child(5) { grid-row: 4; }
     .table-row > *:nth-child(6) { grid-row: 5; }
-    .table-row > *:nth-child(7) { grid-row: 6; justify-self: start; }
+    .table-row > *:nth-child(7) { grid-row: 6; }
+    .table-row > *:nth-child(8) { grid-row: 7; justify-self: start; }
 
     .dashboard-grid { grid-template-columns: 1fr; }
-    .log-row { grid-template-columns: 1fr; gap: 4px; }
+    .log-row { grid-template-columns: 32px 1fr auto; gap: 4px; }
+    .log-row > *:nth-child(n+4) { grid-column: 2 / -1; }
     .log-header { display: none; }
   }
 
@@ -791,6 +799,7 @@
         <span>สถานะ</span>
         <span>เวอร์ชัน</span>
         <span>หมายเหตุ</span>
+        <span title="Hardware ID - รหัสประจำเครื่องที่ผูกกับ license">HWID</span>
         <span>ใช้เมื่อ / IP</span>
         <span style="text-align:right;">จัดการ</span>
       </div>
@@ -801,16 +810,19 @@
   <!-- ════════════ LOGS TAB ════════════ -->
   <div id="tab-logs" class="hidden">
     <div class="toolbar">
+      <button class="btn btn-secondary" onclick="deleteSelectedLogs()" id="btn-delete-selected-logs" style="display:none;">🗑️ ลบที่เลือก (<span id="selected-logs-count">0</span>)</button>
+      <button class="btn btn-secondary" onclick="deleteAllLogs()" style="color:var(--red);">🗑️ ลบทั้งหมด</button>
       <button class="btn btn-secondary" onclick="loadLogs()" style="margin-left: auto;">🔄 Refresh</button>
     </div>
     <div class="table-card">
       <div class="log-row log-header">
+        <span><div class="check-box" id="select-all-logs" onclick="toggleSelectAllLogs()"></div></span>
         <span>เวลา</span>
         <span>รหัส</span>
         <span>ผลลัพธ์</span>
+        <span>หมายเหตุ</span>
         <span>IP</span>
-        <span>Version</span>
-        <span>ข้อความ / HWID / UA</span>
+        <span>จัดการ</span>
       </div>
       <div id="logs-body"></div>
     </div>
@@ -1085,9 +1097,15 @@ async function loadKeys() {
 
 async function loadLogs() {
   try {
+    // โหลด keys ด้วย (ถ้ายังไม่มี) เพื่อเอา note มาแสดง
+    if (keysData.length === 0) {
+      const kr = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?select=*&order=created_at.desc&limit=1000`, { headers: HEADERS });
+      if (kr.ok) keysData = await kr.json();
+    }
     const res = await fetch(`${SUPABASE_URL}/rest/v1/usage_logs?select=*&order=created_at.desc&limit=1000`, { headers: HEADERS });
     if (!res.ok) throw new Error("HTTP " + res.status);
     logsData = await res.json();
+    selectedLogIds.clear();
     renderLogs();
   } catch (e) { toast("โหลด log ไม่ได้: " + e.message, "error"); }
 }
@@ -1140,10 +1158,23 @@ function renderKeys() {
       versionsHtml = k.allowed_versions.map(v => `<span class="version-pill" onclick="editVersions(${k.id})">${v}</span>`).join('');
     }
 
+    // HWID cell
+    let hwidHtml;
+    if (k.bound_hwid) {
+      const shortHwid = k.bound_hwid.substring(0, 8) + '...';
+      const reactCount = k.reactivation_count || 0;
+      const reactBadge = reactCount > 0 ? `<span style="font-size:10px; color:var(--label-tertiary); margin-left:4px;">(${reactCount}x)</span>` : '';
+      hwidHtml = `<span class="hwid-bound" title="${k.bound_hwid}\nผูกเมื่อ: ${k.bound_at ? fmtDate(k.bound_at) : '-'}\nติดตั้งซ้ำ: ${reactCount} ครั้ง" style="font-family:'SF Mono',Menlo,Consolas,monospace; font-size:11px; color:var(--blue); cursor:help;">${shortHwid}${reactBadge}</span>`;
+    } else {
+      hwidHtml = `<span style="color:var(--label-tertiary); font-size:12px;">ยังไม่ผูก</span>`;
+    }
+
     const actions = [
+      `<button class="action-btn action-edit" onclick="editKey(${k.id})" title="แก้ไขรหัส">✏️ แก้ไข</button>`,
+      k.bound_hwid ? `<button class="action-btn action-reset" onclick="resetHwid(${k.id},'${k.key}')" title="รีเซ็ต HWID เพื่อให้ใช้กับเครื่องใหม่ได้">🔄 Reset</button>` : '',
       k.status === "unused" ? `<button class="action-btn action-revoke" onclick="revokeKey(${k.id},'${k.key}')">ยกเลิก</button>` : '',
       `<button class="action-btn action-delete" onclick="deleteKey(${k.id},'${k.key}')">ลบ</button>`
-    ].join('');
+    ].filter(x => x).join('');
 
     const selected = selectedIds.has(k.id) ? "selected" : "";
     const checked = selectedIds.has(k.id) ? "checked" : "";
@@ -1157,6 +1188,7 @@ function renderKeys() {
         <span><span class="badge badge-${k.status}">${statusText}</span></span>
         <span>${versionsHtml}</span>
         <span class="note-text">${k.note || "-"}</span>
+        <span>${hwidHtml}</span>
         <span class="used-info">${used}</span>
         <div class="actions">${actions}</div>
       </div>`;
@@ -1253,9 +1285,116 @@ function bulkEditVersions() {
 // ═══════════════════════════════════════════════════════════
 // Edit Versions
 // ═══════════════════════════════════════════════════════════
-function editVersions(id) {
-  editVersionsMulti([id]);
+// ═══════════════════════════════════════════════════════════
+// Edit Key (แก้ไขคีย์ทั้งหมด: ตัวคีย์ + หมายเหตุ + เวอร์ชัน)
+// ═══════════════════════════════════════════════════════════
+function editKey(id) {
+  const k = keysData.find(x => x.id === id);
+  if (!k) return;
+
+  const current = k.allowed_versions || [];
+  const isAll = current.length === 0;
+
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="max-width: 520px;">
+        <h3>✏️ แก้ไขรหัส</h3>
+
+        <div style="margin-bottom: 16px;">
+          <label style="font-size: 12px; color: var(--label-secondary); display: block; margin-bottom: 6px;">รหัส License (15 หลัก)</label>
+          <input type="text" id="edit-key-value" value="${k.key}" maxlength="15"
+            style="width:100%; background:var(--bg-primary); border:0.5px solid var(--separator); color:var(--label-primary); padding:14px; border-radius:10px; font-family:'SF Mono',Consolas,monospace; font-size:20px; letter-spacing:3px; text-align:center; outline:none; font-weight:700;"
+            oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+          <div style="text-align:right; font-size:11px; color:var(--label-tertiary); margin-top:4px; font-family:Consolas,monospace;">
+            <span id="edit-key-count">15</span> / 15
+          </div>
+          <div id="edit-key-warn" style="font-size:12px; color:var(--orange); margin-top:6px; min-height:16px;"></div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="font-size: 12px; color: var(--label-secondary); display: block; margin-bottom: 6px;">หมายเหตุ</label>
+          <input type="text" id="edit-note-value" value="${(k.note || '').replace(/"/g, '&quot;')}" placeholder="เช่น ลูกค้า ABC"
+            style="width:100%; background:var(--bg-primary); border:0.5px solid var(--separator); color:var(--label-primary); padding:12px; border-radius:10px; font-size:14px; outline:none;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="font-size: 12px; color: var(--label-secondary); display: block; margin-bottom: 6px;">เวอร์ชัน</label>
+          <div class="version-select" id="edit-key-versions">
+            <label class="version-checkbox none ${isAll ? 'checked' : ''}"><input type="checkbox" value="_none" ${isAll ? 'checked' : ''} onchange="handleEditVersionCheck(this)">ทุกเวอร์ชัน</label>
+            <label class="version-checkbox ${current.includes('v1') ? 'checked' : ''}"><input type="checkbox" value="v1" ${current.includes('v1') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v1</label>
+            <label class="version-checkbox ${current.includes('v2') ? 'checked' : ''}"><input type="checkbox" value="v2" ${current.includes('v2') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v2</label>
+            <label class="version-checkbox ${current.includes('v3') ? 'checked' : ''}"><input type="checkbox" value="v3" ${current.includes('v3') ? 'checked' : ''} onchange="handleEditVersionCheck(this)">v3</label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="doSaveKey(${id}, '${k.key}')">บันทึก</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("modal-container").innerHTML = html;
+
+  // Update char counter
+  const inp = document.getElementById("edit-key-value");
+  inp.addEventListener("input", function() {
+    document.getElementById("edit-key-count").textContent = this.value.length;
+  });
 }
+
+async function doSaveKey(id, oldKey) {
+  const newKey = document.getElementById("edit-key-value").value.trim();
+  const newNote = document.getElementById("edit-note-value").value.trim();
+
+  // Get versions from edit-key-versions
+  const container = document.getElementById("edit-key-versions");
+  const noneBox = container.querySelector('.version-checkbox.none input');
+  let newVersions = null;
+  if (!noneBox.checked) {
+    newVersions = [...container.querySelectorAll('.version-checkbox:not(.none) input:checked')].map(c => c.value);
+    if (newVersions.length === 0) newVersions = null;
+  }
+
+  // Validate
+  if (newKey.length !== 15) {
+    document.getElementById("edit-key-warn").textContent = "⚠ รหัสต้องมี 15 หลัก";
+    return;
+  }
+
+  // Warning if key changed
+  if (newKey !== oldKey) {
+    const ok = confirm(
+      `⚠️ คุณกำลังเปลี่ยนตัวรหัส\n\n` +
+      `เดิม: ${oldKey}\n` +
+      `ใหม่: ${newKey}\n\n` +
+      `ถ้าลูกค้าได้รหัสเดิมไปแล้ว จะใช้ไม่ได้อีก!\n\n` +
+      `ต้องการดำเนินการต่อ?`
+    );
+    if (!ok) return;
+  }
+
+  try {
+    const body = { key: newKey, note: newNote, allowed_versions: newVersions };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/license_keys?id=eq.${id}`, {
+      method: "PATCH", headers: HEADERS, body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      if (errText.includes("duplicate") || errText.includes("unique")) {
+        document.getElementById("edit-key-warn").textContent = "❌ รหัสนี้มีในระบบแล้ว";
+        return;
+      }
+      throw new Error(errText);
+    }
+    closeModal();
+    toast("✓ บันทึกเรียบร้อย");
+    await loadKeys();
+  } catch (e) {
+    toast("บันทึกไม่สำเร็จ: " + e.message, "error");
+  }
+}
+
+
 
 function editVersionsMulti(ids) {
   const current = ids.length === 1 ? (keysData.find(k => k.id === ids[0])?.allowed_versions || []) : [];
@@ -1503,26 +1642,123 @@ function renderLogs() {
   const body = document.getElementById("logs-body");
   if (logsData.length === 0) {
     body.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>ยังไม่มีประวัติการใช้</div>';
+    updateLogBulkBar();
     return;
   }
   const sm = {
     success: "✓ สำเร็จ", invalid: "✗ ผิด",
     already_used: "◉ ใช้แล้ว", revoked: "⊘ ยกเลิก",
-    wrong_version: "⚠ เวอร์ชันผิด"
+    wrong_version: "⚠ เวอร์ชันผิด",
+    hwid_mismatch: "🔴 เครื่องอื่น", reactivation: "🔵 ติดตั้งซ้ำ",
+    hwid_reset: "⚪ Reset HWID"
   };
   body.innerHTML = logsData.map(l => {
-    let extraInfo = l.message || '';
-    if (l.hwid) extraInfo += `<br><span style="color:var(--label-tertiary);font-size:10px;">HWID: ${l.hwid.substring(0,16)}</span>`;
+    // หาหมายเหตุจาก keysData
+    const keyInfo = keysData.find(k => k.key === l.key_attempted);
+    const note = keyInfo ? (keyInfo.note || '-') : '-';
+
+    const selected = selectedLogIds.has(l.id) ? "selected" : "";
+    const checked = selectedLogIds.has(l.id) ? "checked" : "";
+
     return `
-    <div class="log-row">
+    <div class="log-row ${selected}">
+      <div class="row-check">
+        <div class="check-box ${checked}" onclick="toggleSelectLog(${l.id})"></div>
+      </div>
       <span class="log-time">${fmtDate(l.created_at)}</span>
       <span class="log-key">${l.key_attempted}</span>
       <span class="log-status status-${l.status}">${sm[l.status] || l.status}</span>
+      <span class="log-note">${note}</span>
       <span class="log-ip">${l.ip || '-'}</span>
-      <span class="log-version">${l.version || '-'}</span>
-      <span class="log-msg">${extraInfo}</span>
+      <div class="actions">
+        <button class="action-btn action-delete" onclick="deleteLog(${l.id})" title="ลบ log นี้">ลบ</button>
+      </div>
     </div>`;
   }).join('');
+  updateLogBulkBar();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Log Selection & Delete
+// ═══════════════════════════════════════════════════════════
+let selectedLogIds = new Set();
+
+function toggleSelectLog(id) {
+  if (selectedLogIds.has(id)) selectedLogIds.delete(id);
+  else selectedLogIds.add(id);
+  renderLogs();
+}
+
+function toggleSelectAllLogs() {
+  if (selectedLogIds.size === logsData.length) {
+    selectedLogIds.clear();
+  } else {
+    logsData.forEach(l => selectedLogIds.add(l.id));
+  }
+  renderLogs();
+}
+
+function updateLogBulkBar() {
+  const btn = document.getElementById("btn-delete-selected-logs");
+  const countEl = document.getElementById("selected-logs-count");
+  const allBox = document.getElementById("select-all-logs");
+  if (btn) {
+    btn.style.display = selectedLogIds.size > 0 ? "" : "none";
+    countEl.textContent = selectedLogIds.size;
+  }
+  if (allBox) {
+    allBox.className = selectedLogIds.size === logsData.length && logsData.length > 0
+      ? "check-box checked" : "check-box";
+  }
+}
+
+async function deleteLog(id) {
+  if (!confirm("ลบ log นี้?")) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/usage_logs?id=eq.${id}`, {
+      method: "DELETE", headers: HEADERS
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast("ลบ log แล้ว");
+    await loadLogs();
+  } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
+}
+
+async function deleteSelectedLogs() {
+  if (selectedLogIds.size === 0) return;
+  if (!confirm(`ลบ ${selectedLogIds.size} log ที่เลือก?`)) return;
+  try {
+    const ids = [...selectedLogIds];
+    const idFilter = ids.map(id => `id.eq.${id}`).join(",");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/usage_logs?or=(${idFilter})`, {
+      method: "DELETE", headers: HEADERS
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`ลบ ${ids.length} log แล้ว`);
+    selectedLogIds.clear();
+    await loadLogs();
+  } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
+}
+
+async function deleteAllLogs() {
+  const count = logsData.length;
+  if (count === 0) { toast("ไม่มี log ให้ลบ"); return; }
+
+  const confirm1 = confirm(`⚠️ ลบ log ทั้งหมด ${count} รายการ?\n\nข้อมูลจะหายถาวร!`);
+  if (!confirm1) return;
+
+  const confirm2 = confirm(`⚠️ ยืนยันอีกครั้ง\n\nคุณแน่ใจว่าต้องการลบ log ทั้งหมด ${count} รายการ?`);
+  if (!confirm2) return;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/usage_logs?id=gt.0`, {
+      method: "DELETE", headers: HEADERS
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast(`ลบ log ทั้งหมด ${count} รายการแล้ว`);
+    selectedLogIds.clear();
+    await loadLogs();
+  } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1679,6 +1915,36 @@ async function deleteKey(id, key) {
     toast("ลบรหัสแล้ว");
     await loadKeys();
   } catch (e) { toast("ลบไม่สำเร็จ: " + e.message, "error"); }
+}
+
+async function resetHwid(id, key) {
+  const ok = confirm(
+    `🔄 รีเซ็ต HWID สำหรับรหัส ${key}?\n\n` +
+    `หลังรีเซ็ต:\n` +
+    `• รหัสจะกลับเป็นสถานะ "ยังไม่ใช้"\n` +
+    `• ลูกค้าจะใช้รหัสนี้กับเครื่องใหม่ได้\n` +
+    `• เครื่องเดิมจะใช้รหัสนี้ไม่ได้แล้ว\n\n` +
+    `ต้องการดำเนินการต่อหรือไม่?`
+  );
+  if (!ok) return;
+
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/reset_key_hwid", {
+      method: "POST",
+      headers: HEADERS,
+      body: JSON.stringify({ input_key_id: id })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+    if (result.success) {
+      toast(`✓ รีเซ็ต HWID สำเร็จ`);
+    } else {
+      toast(result.message || "รีเซ็ตไม่สำเร็จ", "error");
+    }
+    await loadKeys();
+  } catch (e) {
+    toast("รีเซ็ตไม่สำเร็จ: " + e.message, "error");
+  }
 }
 
 function copyKey(key, el) {
